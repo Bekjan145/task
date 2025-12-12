@@ -10,13 +10,23 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "5433:5432"
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U otpuser -d otpdb" ]
       interval: 5s
       timeout: 5s
       retries: 12
       start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis_otp
+    restart: always
+    ports:
+      - "6379:6379"
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data
 
   api:
     build: .
@@ -32,3 +42,4 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
