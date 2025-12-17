@@ -1,13 +1,13 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 
 class UserCreate(BaseModel):
-    email: EmailStr
-    password: str = Field(..., min_length=8)
+    phone: str = Field(..., min_length=9, max_length=20, description="Phone number")
+    password: str = Field(..., min_length=8, description="Password")
 
 
 class UserLogin(BaseModel):
-    email: EmailStr
+    phone: str = Field(..., min_length=9, max_length=20)
     password: str
 
 
@@ -24,3 +24,7 @@ class TokenRefreshRequest(BaseModel):
 class TokenRefreshResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class LogoutResponse(BaseModel):
+    message: str = "Successfully logged out"

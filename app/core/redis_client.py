@@ -1,7 +1,7 @@
 from redis.asyncio import Redis, ConnectionPool
 from app.core.settings import settings
 
-pool = None
+pool: ConnectionPool | None = None
 
 
 async def init_redis():
@@ -10,14 +10,18 @@ async def init_redis():
         settings.REDIS_URL,
         encoding="utf-8",
         decode_responses=True,
-        max_connections=50
+        max_connections=50,
     )
 
 
-async def get_redis():
+async def get_redis() -> Redis:
+    if pool is None:
+        await init_redis()
     return Redis(connection_pool=pool)
 
 
 async def close_redis():
+    global pool
     if pool:
         await pool.disconnect()
+        pool = None
