@@ -2,12 +2,13 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from fastapi import Depends
 
+from app.db.models.enums import UserRole
 from app.db.models.user import User
 from app.db.database import get_db
 
 
 class UserCRUD:
-    def __init__(self, db: Session):
+    def __init__(self, db: Session = Depends(get_db)):
         self.db = db
 
     def get_by_id(self, user_id: int) -> Optional[User]:
@@ -16,9 +17,14 @@ class UserCRUD:
     def get_by_phone(self, phone: str) -> Optional[User]:
         return self.db.query(User).filter(User.phone == phone).first()
 
-    def create(self, phone: str, hashed_password: str) -> User:
-
-        user = User(phone=phone, hashed_password=hashed_password)
+    def create(self, phone: str, hashed_password: str, username: Optional[str] = None,
+               role: UserRole = UserRole.USER) -> User:
+        user = User(
+            phone=phone,
+            hashed_password=hashed_password,
+            username=username,
+            role=role
+        )
         self.db.add(user)
         self.db.commit()
         self.db.refresh(user)
@@ -49,9 +55,5 @@ class UserCRUD:
     def exists_by_phone(self, phone: str) -> bool:
         return self.db.query(User).filter(User.phone == phone).count() > 0
 
-    def list_users(self, skip: int = 0, limit: int = 100) -> list[User]:
+    def list_users(self, skip: int = 0, limit: int = 100):
         return self.db.query(User).offset(skip).limit(limit).all()
-
-
-def get_user_crud(db: Session = Depends(get_db)) -> UserCRUD:
-    return UserCRUD(db)

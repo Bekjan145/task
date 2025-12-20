@@ -1,16 +1,18 @@
 import random
 from typing import Tuple
 
-from fastapi import HTTPException, status, Depends
+from fastapi import Depends
 from redis.asyncio import Redis
 
+from app.core import OTPRateLimitException, OTPCooldownException, OTPVerifyAttemptsExceededException, \
+    OTPIncorrectException, OTPExpiredOrNotFoundException
+from app.core.redis_client import get_redis
 from app.core.settings import settings
 from app.core.validators import validate_phone, normalize_phone
-from app.core.redis_client import get_redis
 
 
 class OTPService:
-    def __init__(self, redis: Redis):
+    def __init__(self, redis: Redis = Depends(get_redis)):
         self.redis = redis
 
     def _generate_otp(self) -> str:
@@ -74,17 +76,11 @@ class OTPService:
 
         is_available, remaining = await self._check_cooldown(normalized_phone)
         if not is_available:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Please wait {remaining} seconds before requesting a new OTP"
-            )
+            raise OTPCooldownException(remaining)
 
         is_allowed, attempts_left = await self._check_rate_limit(normalized_phone)
         if not is_allowed:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Too many OTP requests. Try again in 1 hour"
-            )
+            raise OTPRateLimitException()
 
         code = self._generate_otp()
         otp_key = f"otp:{normalized_phone}"
@@ -106,33 +102,20 @@ class OTPService:
 
         is_allowed, _ = await self._check_verify_attempts(normalized_phone)
         if not is_allowed:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Too many failed verification attempts. Try again in 10 minutes"
-            )
+            raise OTPVerifyAttemptsExceededException()
 
         otp_key = f"otp:{normalized_phone}"
         stored = await self.redis.get(otp_key)
         if not stored:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="OTP expired or not found"
-            )
+            raise OTPExpiredOrNotFoundException()
 
         stored_code = stored.decode("utf-8") if isinstance(stored, bytes) else stored
 
         if stored_code != code:
             await self._increment_verify_attempts(normalized_phone)
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Incorrect code"
-            )
+            raise OTPIncorrectException()
 
         await self.redis.delete(otp_key)
         await self._reset_verify_attempts(normalized_phone)
 
         return {"verified": True, "phone": normalized_phone}
-
-
-async def get_otp_service(redis: Redis = Depends(get_redis)) -> OTPService:
-    return OTPService(redis)

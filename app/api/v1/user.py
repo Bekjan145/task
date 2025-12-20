@@ -1,19 +1,51 @@
-from fastapi import HTTPException, status, APIRouter
+from typing import List
+
+from fastapi import status, APIRouter
 from fastapi.params import Depends
 
-from app.core.security import get_current_user
-from app.db.crud.user import UserCRUD, get_user_crud
+from app.core.permissions import require_admin, require_owner_or_admin
 from app.schemas import UserResponse
+from app.schemas.user import UserCreateAdmin, UserUpdate, UserPatch
+from app.services.user_service import UserService
 
 router = APIRouter(prefix="/user", tags=["user"])
 
 
 @router.get("/me", response_model=UserResponse)
-async def get_current_user_info(current_user: dict = Depends(get_current_user),
-                                user_crud: UserCRUD = Depends(get_user_crud)):
-    user = user_crud.get_by_id(current_user["user_id"])
+async def get_current_user_info(user_service: UserService = Depends()):
+    current_user_id = user_service.current_user["user_id"]
+    return user_service.get_user(current_user_id)
 
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    return user
+@router.get("/users", response_model=List[UserResponse])
+async def list_users(skip: int = 0, limit: int = 100, _: dict = Depends(require_admin),
+                     user_service: UserService = Depends()):
+    return user_service.list_users(skip=skip, limit=limit)
+
+
+@router.get("/users/{user_id}", response_model=UserResponse)
+async def get_user(user_id: int, _: dict = Depends(require_owner_or_admin), user_service: UserService = Depends()):
+    return user_service.get_user(user_id)
+
+
+@router.post("/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+async def create_user(user_data: UserCreateAdmin, _: dict = Depends(require_admin),
+                      user_service: UserService = Depends()):
+    return user_service.create_user(user_data)
+
+
+@router.put("/users/{user_id}", response_model=UserResponse)
+async def update_user(user_id: int, user_data: UserUpdate, _: dict = Depends(require_owner_or_admin),
+                      user_service: UserService = Depends()):
+    return user_service.update_user(user_id, user_data)
+
+
+@router.patch("/users/{user_id}", response_model=UserResponse)
+async def patch_user(user_id: int, user_data: UserPatch, _: dict = Depends(require_owner_or_admin),
+                     user_service: UserService = Depends()):
+    return user_service.patch_user(user_id, user_data)
+
+
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user(user_id: int, _: dict = Depends(require_admin), user_service: UserService = Depends()):
+    user_service.delete_user(user_id)

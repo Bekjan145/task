@@ -8,3 +8,25 @@ from app.core.security import (
     verify_password,
 )
 from app.core.redis_client import get_redis, init_redis, close_redis
+from app.core.exceptions import (
+    # Auth exceptions
+    AuthException,
+    InvalidCredentialsException,
+    TokenInvalidException,
+    TokenRevokedException,
+    InvalidTokenTypeException,
+    # User exceptions
+    UserNotFoundException,
+    PhoneAlreadyExistsException,
+    InvalidPhoneFormatException,
+    # Permission exceptions
+    AccessDeniedException,
+    AdminAccessRequiredException,
+    # OTP exceptions
+    OTPException,
+    OTPCooldownException,
+    OTPRateLimitException,
+    OTPExpiredOrNotFoundException,
+    OTPIncorrectException,
+    OTPVerifyAttemptsExceededException,
+)

@@ -1,5 +1,6 @@
 import re
-from fastapi import HTTPException, status
+
+from app.core.exceptions import InvalidPhoneFormatException
 
 
 def validate_phone(phone: str) -> None:
@@ -8,10 +9,7 @@ def validate_phone(phone: str) -> None:
     uz_pattern = r'^(?:\+998|998)?([0-9]{9})$'
 
     if not re.match(uz_pattern, cleaned):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid phone number format. Expected format: +998901234567 or 901234567"
-        )
+        raise InvalidPhoneFormatException()
 
 
 def normalize_phone(phone: str) -> str:

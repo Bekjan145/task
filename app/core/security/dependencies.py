@@ -1,11 +1,12 @@
-from fastapi import HTTPException, status, Depends
+from fastapi import Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from redis.asyncio import Redis
 
+from app.core.exceptions import InvalidTokenTypeException, TokenInvalidException, TokenRevokedException
+from app.core.redis_client import get_redis
 from app.core.security.blacklist import is_token_blacklisted
 from app.core.settings import settings
-from app.core.redis_client import get_redis
 
 security = HTTPBearer()
 
@@ -14,10 +15,10 @@ async def verify_token_payload(token: str, token_type: str = "access") -> dict:
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         if payload.get("type") != token_type:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
+            raise InvalidTokenTypeException()
         return payload
     except JWTError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate credentials")
+        raise TokenInvalidException()
 
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security),
@@ -27,10 +28,10 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 
     jti = payload.get("jti")
     if jti and await is_token_blacklisted(redis, jti):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token revoked")
+        raise TokenRevokedException()
 
     user_id = payload.get("sub")
     if not user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate credentials")
+        raise TokenInvalidException()
 
-    return {"user_id": int(user_id), "phone": payload.get("phone"), "token_jti": jti}
+    return {"user_id": int(user_id), "phone": payload.get("phone"), "token_jti": jti, "role": payload.get("role")}
