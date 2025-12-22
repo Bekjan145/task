@@ -1,95 +1,85 @@
+from typing import Any
+
 from fastapi import HTTPException, status
 
 
-class AuthException(HTTPException):
-    """Base authentication exception"""
-    def __init__(self, detail: str, status_code: int = status.HTTP_401_UNAUTHORIZED):
-        super().__init__(status_code=status_code, detail=detail)
+class BaseHTTPException(HTTPException):
+    status_code: int = status.HTTP_400_BAD_REQUEST
+    detail: str = "An error occurred"
+
+    def __init__(self, **kwargs: Any):
+        detail = kwargs.pop("detail", self.detail)
+        super().__init__(status_code=self.status_code, detail=detail, **kwargs)
+
+
+class AuthException(BaseHTTPException):
+    status_code = status.HTTP_401_UNAUTHORIZED
+    detail = "Authentication error"
 
 
 class InvalidCredentialsException(AuthException):
-    def __init__(self):
-        super().__init__(detail="Invalid phone or password")
+    detail = "Invalid phone or password"
 
 
 class TokenInvalidException(AuthException):
-    def __init__(self, detail: str = "Could not validate credentials"):
-        super().__init__(detail=detail)
+    detail = "Could not validate credentials"
 
 
 class TokenRevokedException(AuthException):
-    def __init__(self):
-        super().__init__(detail="Token revoked")
+    detail = "Token revoked"
 
 
 class InvalidTokenTypeException(AuthException):
-    def __init__(self):
-        super().__init__(detail="Invalid token type")
+    detail = "Invalid token type"
 
 
-class UserNotFoundException(HTTPException):
-    def __init__(self):
-        super().__init__(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+class UserNotFoundException(BaseHTTPException):
+    status_code = status.HTTP_404_NOT_FOUND
+    detail = "User not found"
 
 
-class PhoneAlreadyExistsException(HTTPException):
-    def __init__(self):
-        super().__init__(status_code=status.HTTP_400_BAD_REQUEST, detail="Phone already registered")
+class PhoneAlreadyExistsException(BaseHTTPException):
+    detail = "Phone already registered"
 
 
-class InvalidPhoneFormatException(HTTPException):
-    def __init__(self):
-        super().__init__(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid phone number format. Expected format: +998901234567 or 901234567"
-        )
+class InvalidPhoneFormatException(BaseHTTPException):
+    detail = "Invalid phone number format. Expected format: +998901234567 or 901234567"
 
 
-class AccessDeniedException(HTTPException):
-    def __init__(self):
-        super().__init__(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+class AccessDeniedException(BaseHTTPException):
+    status_code = status.HTTP_403_FORBIDDEN
+    detail = "Access denied"
 
 
-class AdminAccessRequiredException(HTTPException):
-    def __init__(self):
-        super().__init__(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+class AdminAccessRequiredException(AccessDeniedException):
+    detail = "Admin access required"
 
 
-class OTPException(HTTPException):
-    """Base OTP exception"""
-    def __init__(self, detail: str, status_code: int = status.HTTP_400_BAD_REQUEST):
-        super().__init__(status_code=status_code, detail=detail)
+class OTPException(BaseHTTPException):
+    detail = "OTP error"
 
 
-class OTPCooldownException(HTTPException):
+class OTPCooldownException(BaseHTTPException):
+    status_code = status.HTTP_429_TOO_MANY_REQUESTS
+
     def __init__(self, remaining_seconds: int):
-        super().__init__(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Please wait {remaining_seconds} seconds before requesting a new OTP"
-        )
+        detail = f"Please wait {remaining_seconds} seconds before requesting a new OTP"
+        super().__init__(detail=detail)
 
 
-class OTPRateLimitException(HTTPException):
-    def __init__(self):
-        super().__init__(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many OTP requests. Try again in 1 hour"
-        )
+class OTPRateLimitException(BaseHTTPException):
+    status_code = status.HTTP_429_TOO_MANY_REQUESTS
+    detail = "Too many OTP requests. Try again in 1 hour"
 
 
 class OTPExpiredOrNotFoundException(OTPException):
-    def __init__(self):
-        super().__init__(detail="OTP expired or not found")
+    detail = "OTP expired or not found"
 
 
 class OTPIncorrectException(OTPException):
-    def __init__(self):
-        super().__init__(detail="Incorrect code")
+    detail = "Incorrect code"
 
 
-class OTPVerifyAttemptsExceededException(HTTPException):
-    def __init__(self):
-        super().__init__(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many failed verification attempts. Try again in 10 minutes"
-        )
+class OTPVerifyAttemptsExceededException(BaseHTTPException):
+    status_code = status.HTTP_429_TOO_MANY_REQUESTS
+    detail = "Too many failed verification attempts. Try again in 10 minutes"
