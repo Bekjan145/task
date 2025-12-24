@@ -24,3 +24,8 @@ def normalize_phone(phone: str) -> str:
             cleaned = '+998' + cleaned
 
     return cleaned
+
+
+def process_phone(phone: str) -> str:
+    validate_phone(phone)
+    return normalize_phone(phone)

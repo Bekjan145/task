@@ -3,9 +3,9 @@ from starlette.requests import Request
 from starlette.responses import RedirectResponse
 
 from app.core.security.hashing import verify_password
-from app.core.validators import normalize_phone, validate_phone
+from app.core.validators import process_phone
 from app.db.crud.user import UserCRUD
-from app.db.database import SessionLocal
+from app.db.database import get_db
 from app.db.models.enums import UserRole
 
 
@@ -18,12 +18,12 @@ class AdminAuth(AuthenticationBackend):
         if not phone or not password:
             return False
 
-        db = SessionLocal()
-        try:
-            validate_phone(phone)
-            normalized_phone = normalize_phone(phone)
-            user = UserCRUD(db=db).get_by_phone(normalized_phone)
+        async for db in get_db():
+            user_crud = UserCRUD(db=db)
 
+            normalized_phone = process_phone(phone)
+
+            user = await user_crud.get_by_phone(normalized_phone)
             if not user or user.role != UserRole.ADMIN:
                 return False
 
@@ -33,10 +33,6 @@ class AdminAuth(AuthenticationBackend):
             request.session["user_id"] = user.id
             request.session["role"] = user.role
             return True
-        except Exception:
-            return False
-        finally:
-            db.close()
 
     async def logout(self, request: Request) -> bool:
         request.session.clear()

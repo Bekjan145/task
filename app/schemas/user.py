@@ -22,11 +22,15 @@ class UserCreateAdmin(BaseModel):
     role: UserRole = UserRole.USER
 
 
-class UserUpdate(BaseModel):
+class UserPut(BaseModel):
     username: Optional[str] = None
     phone: Optional[str] = None
+
+    model_config = {"extra": "forbid"}
 
 
 class UserPatch(BaseModel):
     username: Optional[str] = None
     phone: Optional[str] = None
+
+    model_config = {"extra": "forbid", "populate_by_name": True, }

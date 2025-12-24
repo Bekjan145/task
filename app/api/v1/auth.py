@@ -11,13 +11,13 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/register", response_model=TokenResponse)
 async def register(user_data: UserCreate, auth_service: AuthService = Depends()):
-    access_token, refresh_token = auth_service.register(phone=user_data.phone, password=user_data.password)
+    access_token, refresh_token = await auth_service.register(phone=user_data.phone, password=user_data.password)
     return TokenResponse(access_token=access_token, refresh_token=refresh_token)
 
 
 @router.post("/login", response_model=TokenResponse)
 async def login(user_data: UserLogin, auth_service: AuthService = Depends()):
-    access_token, refresh_token = auth_service.login(phone=user_data.phone, password=user_data.password)
+    access_token, refresh_token = await auth_service.login(phone=user_data.phone, password=user_data.password)
     return TokenResponse(access_token=access_token, refresh_token=refresh_token)
 
 

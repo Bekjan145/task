@@ -8,7 +8,7 @@ from app.core import OTPRateLimitException, OTPCooldownException, OTPVerifyAttem
     OTPIncorrectException, OTPExpiredOrNotFoundException
 from app.core.redis_client import get_redis
 from app.core.settings import settings
-from app.core.validators import validate_phone, normalize_phone
+from app.core.validators import process_phone
 
 
 class OTPService:
@@ -33,15 +33,13 @@ class OTPService:
         if current >= settings.OTP_MAX_ATTEMPTS:
             return False, 0
 
-        attempts_left = settings.OTP_MAX_ATTEMPTS - current - 1
+        return True, settings.OTP_MAX_ATTEMPTS - current - 1
 
-        return True, attempts_left
-
-    async def _set_cooldown(self, phone: str):
+    async def _set_cooldown(self, phone: str) -> None:
         key = f"otp:cooldown:{phone}"
         await self.redis.setex(key, settings.OTP_COOLDOWN_SECONDS, "active")
 
-    async def _increment_rate_limit(self, phone: str):
+    async def _increment_rate_limit(self, phone: str) -> None:
         key = f"otp:rate_limit:{phone}"
         attempts = await self.redis.incr(key)
 
@@ -59,20 +57,19 @@ class OTPService:
         attempts_left = settings.OTP_MAX_VERIFY_ATTEMPTS - current_attempts
         return True, attempts_left
 
-    async def _increment_verify_attempts(self, phone: str):
+    async def _increment_verify_attempts(self, phone: str) -> None:
         key = f"otp:verify_attempts:{phone}"
         attempts = await self.redis.incr(key)
 
         if attempts == 1:
             await self.redis.expire(key, settings.OTP_VERIFY_ATTEMPTS_WINDOW)
 
-    async def _reset_verify_attempts(self, phone: str):
+    async def _reset_verify_attempts(self, phone: str) -> None:
         key = f"otp:verify_attempts:{phone}"
         await self.redis.delete(key)
 
     async def send_otp(self, phone: str) -> dict:
-        validate_phone(phone)
-        normalized_phone = normalize_phone(phone)
+        normalized_phone = process_phone(phone)
 
         is_available, remaining = await self._check_cooldown(normalized_phone)
         if not is_available:
@@ -84,7 +81,8 @@ class OTPService:
 
         code = self._generate_otp()
         otp_key = f"otp:{normalized_phone}"
-        await self.redis.setex(otp_key, int(settings.OTP_EXPIRE_MINUTES * 60), code)
+        expire_sec = int(settings.OTP_EXPIRE_MINUTES * 60)
+        await self.redis.setex(otp_key, expire_sec, code)
 
         await self._set_cooldown(normalized_phone)
         await self._increment_rate_limit(normalized_phone)
@@ -97,8 +95,7 @@ class OTPService:
         }
 
     async def verify_otp(self, phone: str, code: str) -> dict:
-        validate_phone(phone)
-        normalized_phone = normalize_phone(phone)
+        normalized_phone = process_phone(phone)
 
         is_allowed, _ = await self._check_verify_attempts(normalized_phone)
         if not is_allowed:
@@ -107,6 +104,7 @@ class OTPService:
         otp_key = f"otp:{normalized_phone}"
         stored = await self.redis.get(otp_key)
         if not stored:
+            await self._increment_verify_attempts(normalized_phone)
             raise OTPExpiredOrNotFoundException()
 
         stored_code = stored.decode("utf-8") if isinstance(stored, bytes) else stored

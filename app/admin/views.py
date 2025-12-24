@@ -1,7 +1,7 @@
 from sqladmin import ModelView
 
 from app.core import hash_password
-from app.core.validators import validate_phone, normalize_phone
+from app.core.validators import process_phone
 from app.db.models.user import User
 
 
@@ -23,8 +23,7 @@ class UserAdmin(ModelView, model=User):
     async def on_model_change(self, data: dict, model: User, is_created: bool, request) -> None:
         phone = data.get("phone")
         if phone:
-            validate_phone(phone)
-            data["phone"] = normalize_phone(phone)
+            data["phone"] = process_phone(phone)
 
         password = data.get("hashed_password")
         if password and (is_created or password != "***"):
